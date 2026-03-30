@@ -1,6 +1,7 @@
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import type { Express } from "express";
+import path from "path";
 
 const options: swaggerJsdoc.Options = {
     definition: {
@@ -32,7 +33,11 @@ const options: swaggerJsdoc.Options = {
         },
         security: [{ cookieAuth: [] }, { bearerAuth: [] }],
     },
-    apis: ["./src/routes/*.ts"],
+    apis: [
+        path.join(process.cwd(), "src/routes/*.ts"),   // Untuk dev (lokal)
+        path.join(process.cwd(), "dist/routes/*.mjs"), // Untuk production (Docker)
+        path.join(process.cwd(), "dist/routes/*.js"),  // Backup jika ada .js biasa
+    ],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
