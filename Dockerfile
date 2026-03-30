@@ -26,6 +26,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
+# Copy Drizzle files for in-container migrations (Option 2)
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/src/db ./src/db
+
 EXPOSE 3000
 
 CMD ["node", "./dist/index.mjs"]
