@@ -1,5 +1,5 @@
 # Build Stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 # Enable corepack for pnpm
 RUN corepack enable
@@ -17,7 +17,7 @@ COPY . .
 RUN pnpm run build
 
 # Production Stage
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 
 WORKDIR /app
 
