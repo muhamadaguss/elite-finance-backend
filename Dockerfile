@@ -28,4 +28,4 @@ COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3000
 
-CMD ["node", "--env-file=.env", "./dist/index.mjs"]
+CMD ["node", "./dist/index.mjs"]
