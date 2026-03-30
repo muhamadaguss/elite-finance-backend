@@ -1,0 +1,23 @@
+# compiled output
+dist
+*.tsbuildinfo
+
+# dependencies
+node_modules
+
+# environment
+.env
+
+# IDEs
+.idea
+.vscode
+*.sublime-workspace
+
+# misc
+coverage
+npm-debug.log
+yarn-error.log
+
+# System Files
+.DS_Store
+Thumbs.db
