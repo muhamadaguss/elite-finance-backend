@@ -2,12 +2,13 @@
  * Receipt Parser - Pure regex-based engine
  * Extracts structured data from raw OCR text without any AI/API key.
  * Supports Indonesian receipts (Rp format, dd/mm/yyyy dates, etc.)
+ * Also supports digital payment screenshots (Jago, GoPay, OVO, etc.)
  */
 
 export interface ParsedReceipt {
-  date: string;                         // YYYY-MM-DD
-  description: string;                  // Merchant name
-  amount: number;                       // Grand total in IDR
+  date: string; // YYYY-MM-DD
+  description: string; // Merchant name
+  amount: number; // Grand total in IDR
   type: "expense";
   items: { name: string; price: number }[];
   notes: string | null;
@@ -27,7 +28,10 @@ export interface ParsedReceipt {
  */
 function parseCurrency(raw: string): number {
   // Remove currency symbols, spaces
-  let s = raw.replace(/Rp\.?\s*/gi, "").replace(/IDR\s*/gi, "").trim();
+  let s = raw
+    .replace(/Rp\.?\s*/gi, "")
+    .replace(/IDR\s*/gi, "")
+    .trim();
 
   // Remove trailing decimals (.00 or ,00)
   s = s.replace(/[.,]0{2}$/, "");
@@ -51,7 +55,10 @@ function parseCurrency(raw: string): number {
 
 // ─── Date parsing helper ──────────────────────────────────────────────────────
 
-const DATE_PATTERNS: { regex: RegExp; parse: (m: RegExpMatchArray) => string }[] = [
+const DATE_PATTERNS: {
+  regex: RegExp;
+  parse: (m: RegExpMatchArray) => string;
+}[] = [
   // YYYY-MM-DD or YYYY/MM/DD
   {
     regex: /\b(20\d{2})[-/](0[1-9]|1[0-2])[-/](0[1-9]|[12]\d|3[01])\b/,
@@ -62,13 +69,24 @@ const DATE_PATTERNS: { regex: RegExp; parse: (m: RegExpMatchArray) => string }[]
     regex: /\b(0[1-9]|[12]\d|3[01])[-/.](0[1-9]|1[0-2])[-/.](20\d{2})\b/,
     parse: (m) => `${m[3]}-${m[2]}-${m[1]}`,
   },
-  // DD Mon YYYY  e.g. "31 Mar 2026" or "31 Maret 2026"
+  // DD Mon YYYY  e.g. "31 Mar 2026" or "31 Maret 2026" or "22 Mar 2026, 20:52 WIB"
   {
-    regex: /\b(0?[1-9]|[12]\d|3[01])\s+(Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s+(20\d{2})\b/i,
+    regex:
+      /\b(0?[1-9]|[12]\d|3[01])\s+(Jan(?:uari)?|Feb(?:ruari)?|Mar(?:et)?|Apr(?:il)?|Mei|Jun(?:i)?|Jul(?:i)?|Agu(?:stus)?|Sep(?:tember)?|Okt(?:ober)?|Nov(?:ember)?|Des(?:ember)?)\s+(20\d{2})\b/i,
     parse: (m) => {
       const months: Record<string, string> = {
-        jan: "01", feb: "02", mar: "03", apr: "04", mei: "05", jun: "06",
-        jul: "07", agu: "08", sep: "09", okt: "10", nov: "11", des: "12",
+        jan: "01",
+        feb: "02",
+        mar: "03",
+        apr: "04",
+        mei: "05",
+        jun: "06",
+        jul: "07",
+        agu: "08",
+        sep: "09",
+        okt: "10",
+        nov: "11",
+        des: "12",
       };
       const month = months[m[2].toLowerCase().slice(0, 3)] ?? "01";
       const day = m[1].padStart(2, "0");
@@ -90,9 +108,12 @@ function extractDate(text: string): string | null {
 /**
  * Look for grand total / jumlah bayar patterns.
  * Priority order: TOTAL BAYAR > GRAND TOTAL > TOTAL > JUMLAH > SUBTOTAL
+ * Also handles digital payment receipts (Jago, GoPay, OVO, etc.)
  */
 const TOTAL_PATTERNS = [
-  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
+  // Digital payment apps - amount is usually displayed prominently
+  /^Rp\s*(\d[\d.,]+)$/im, // Standalone "Rp376.530" on its own line
+  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
   /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
   /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
   /(?:\bsubtotal\b|\bsub\s*total\b)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
@@ -121,20 +142,41 @@ function extractTotal(text: string): number | null {
 
 // ─── Merchant name extraction ─────────────────────────────────────────────────
 
-const SKIP_LINES = /^\s*$|^\d+$|struk|receipt|nota|kasir|cashier|npwp|no\.|invoice|bill|kwitansi/i;
-const SKIP_WORDS = /^(jl\.|jalan|tel|phone|www|http|@)/i;
+const SKIP_LINES =
+  /^\s*$|^\d+$|^Rp\s*\d|struk|receipt|nota|kasir|cashier|npwp|no\.|invoice|bill|kwitansi|sukses|berhasil|transaksi|id\s*transaksi|sumber\s*akun|sumber\s*dana|nama\s*acquirer|pan\s*merchant|pan\s*pelanggan|id\s*terminal|nomor\s*referensi|biaya|gratis|resi\s*ini/i;
+const SKIP_WORDS =
+  /^(syariah|jl\.|jalan|tel|phone|www|http|@|jago|gopay|ovo|dana|shopeepay|linkaja|bri|bca|mandiri|bni|cimb|permata|jenius|blu|tmrw|livin|brimo)$/i;
 
 function extractMerchant(lines: string[]): string {
-  for (const line of lines.slice(0, 8)) {
-    const trimmed = line.trim();
+  // Scan lines for merchant name and try to combine consecutive caps lines
+  let merchantLines: string[] = [];
+
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
+    const trimmed = lines[i].trim();
     if (trimmed.length < 3) continue;
     if (SKIP_LINES.test(trimmed)) continue;
     if (SKIP_WORDS.test(trimmed)) continue;
-    // Prefer lines that are mostly letters (not "85.000")
-    const letterRatio = (trimmed.match(/[a-zA-Z]/g)?.length ?? 0) / trimmed.length;
-    if (letterRatio > 0.4) return trimmed;
+
+    // Check if it's mostly uppercase letters (for payment app screenshots)
+    const upperRatio = (trimmed.match(/[A-Z]/g)?.length ?? 0) / trimmed.length;
+    const letterRatio =
+      (trimmed.match(/[a-zA-Z]/g)?.length ?? 0) / trimmed.length;
+
+    if (letterRatio > 0.4 && upperRatio > 0.5) {
+      merchantLines.push(trimmed);
+      // Collect up to 3 consecutive lines that look like merchant name
+      if (merchantLines.length >= 3) break;
+    } else if (merchantLines.length > 0) {
+      // Stop if we already have some merchant lines and hit a non-matching line
+      break;
+    }
   }
-  return "Belanja";
+
+  if (merchantLines.length > 0) {
+    return merchantLines.join(" ");
+  }
+
+  return "Pembayaran";
 }
 
 // ─── Line items extraction ────────────────────────────────────────────────────
@@ -177,9 +219,11 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   // Confidence scoring
   const hasDate = extractDate(rawText) !== null;
   const hasTotal = amount !== null && amount > 0;
+  const hasMerchant = description !== "Pembayaran" && description !== "Belanja";
 
   let confidence: "high" | "medium" | "low";
-  if (hasDate && hasTotal) confidence = "high";
+  if (hasDate && hasTotal && hasMerchant) confidence = "high";
+  else if (hasDate && hasTotal) confidence = "high";
   else if (hasTotal) confidence = "medium";
   else confidence = "low";
 
@@ -189,7 +233,7 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
     amount: amount ?? 0,
     type: "expense",
     items,
-    notes: rawText.length > 0 ? `OCR raw: ${rawText.slice(0, 200)}` : null,
+    notes: null, // Don't expose raw OCR text to reduce noise
     confidence,
   };
 }
