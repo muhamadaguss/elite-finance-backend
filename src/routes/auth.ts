@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
+import rateLimit from "express-rate-limit";
 import { db, usersTable, categoriesTable } from "../db";
 import { eq } from "drizzle-orm";
 import {
@@ -13,6 +14,16 @@ import {
 } from "../lib/auth";
 
 const router: IRouter = Router();
+
+// Security: Strict Rate Limiter for Login & Register
+// Maximum 5 login/register attempts per 15 minutes per IP
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: "Terlalu banyak percobaan. Silakan tunggu 15 menit." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 /**
  * @swagger
@@ -157,7 +168,7 @@ router.get("/auth/user", (req: Request, res: Response) => {
   }
 });
 
-router.post("/auth/register", async (req: Request, res: Response) => {
+router.post("/auth/register", authLimiter, async (req: Request, res: Response) => {
   const { username, password, firstName, lastName } = req.body;
 
   if (!username || !password) {
@@ -232,7 +243,7 @@ router.post("/auth/register", async (req: Request, res: Response) => {
   });
 });
 
-router.post("/auth/login", async (req: Request, res: Response) => {
+router.post("/auth/login", authLimiter, async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   if (!username || !password || typeof username !== "string" || typeof password !== "string") {
