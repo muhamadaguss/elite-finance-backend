@@ -106,7 +106,7 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
 
     // 2. Run OCR
     const rawText = await recognizeText(processedBuffer);
-    logger.debug({ rawText: rawText.slice(0, 300) }, "OCR raw text");
+    logger.info({ rawText: rawText.slice(0, 500) }, "OCR raw text");
 
     // 3. Parse the extracted text
     const parsed = parseReceiptText(rawText);
@@ -118,6 +118,7 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
         date: parsed.date,
         confidence: parsed.confidence,
         itemCount: parsed.items.length,
+        rawTextLength: rawText.length,
       },
       "Receipt scan completed"
     );
@@ -133,7 +134,7 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
       categoryIcon: null,
       categoryColor: null,
       items: parsed.items,
-      notes: null, // Don't expose raw OCR text to user
+      notes: `OCR: ${rawText.slice(0, 200)}...`, // Expose raw OCR for debugging
       confidence: parsed.confidence,
     });
   } catch (err) {
@@ -204,6 +205,12 @@ router.post("/receipt/confirm", requireAuth, async (req, res) => {
     res.status(400).json({
       error: result.error.errors[0]?.message ?? "Validasi gagal",
     });
+    return;
+  }
+
+  // requireAuth middleware guarantees req.user exists
+  if (!req.user) {
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 

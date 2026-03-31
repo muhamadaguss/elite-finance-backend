@@ -111,8 +111,9 @@ function extractDate(text: string): string | null {
  * Also handles digital payment receipts (Jago, GoPay, OVO, etc.)
  */
 const TOTAL_PATTERNS = [
-  // Digital payment apps - amount is usually displayed prominently
+  // Digital payment apps - amount is usually displayed prominently at the top
   /^Rp\s*(\d[\d.,]+)$/im, // Standalone "Rp376.530" on its own line
+  /^(\d[\d.,]{4,})$/m, // Standalone number "376530" or "376.530"
   /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
   /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
   /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
@@ -129,7 +130,7 @@ function extractTotal(text: string): number | null {
   }
 
   // Fallback: find the largest currency amount in the text
-  const allAmounts = [...text.matchAll(/(?:Rp\.?\s*)(\d[\d.,]+)/gi)]
+  const allAmounts = [...text.matchAll(/(?:Rp\.?\s*)?(\d[\d.,]{3,})/gi)]
     .map((m) => parseCurrency(m[1]))
     .filter((v) => v >= 1000); // at least Rp 1.000
 
