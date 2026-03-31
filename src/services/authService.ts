@@ -112,7 +112,9 @@ export async function register(req: Request, res: Response): Promise<void> {
       res.status(409).json({ error: "Username sudah digunakan" });
       return;
     }
-    throw err;
+    console.error("RAW DB ERROR:", err);
+    res.status(500).json({ error: "DB Error", details: err?.message || String(err), code: err?.code });
+    return;
   }
 
   await seedDefaultCategories(user.id);
