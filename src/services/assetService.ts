@@ -6,6 +6,7 @@ import {
   UpdateAssetParams,
   DeleteAssetParams,
 } from "../validation";
+import { clearUserCache } from "../lib/redis";
 
 export async function listAssets(req: Request, res: Response) {
   const userId = req.user!.id;
@@ -17,6 +18,7 @@ export async function createAsset(req: Request, res: Response) {
   const userId = req.user!.id;
   const body = CreateAssetBody.parse(req.body);
   const created = await assetRepository.createAsset(userId, body);
+  await clearUserCache(userId);
   res.status(201).json(created);
 }
 
@@ -29,6 +31,7 @@ export async function updateAsset(req: Request, res: Response): Promise<void> {
     res.status(404).json({ error: "Asset not found" });
     return;
   }
+  await clearUserCache(userId);
   res.json(updated);
 }
 
@@ -36,6 +39,7 @@ export async function deleteAsset(req: Request, res: Response) {
   const { id } = DeleteAssetParams.parse(req.params);
   const userId = req.user!.id;
   await assetRepository.deleteAsset(userId, String(id));
+  await clearUserCache(userId);
   res.status(204).send();
 }
 

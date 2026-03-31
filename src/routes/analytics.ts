@@ -1,7 +1,11 @@
 import { Router, type IRouter } from "express";
 import * as analyticsController from "../controllers/analyticsController";
+import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 
 const router: IRouter = Router();
+
+// Apply a long TTL (30 days = 2592000 seconds) since we manage cache invalidation manually anyway
+const analyticsCache = cacheMiddleware(2592000);
 
 /**
  * @swagger
@@ -20,7 +24,11 @@ const router: IRouter = Router();
  *       200:
  *         description: Monthly summary with income, expenses, savings, and top categories
  */
-router.get("/analytics/monthly-summary", analyticsController.getMonthlySummary);
+router.get(
+  "/analytics/monthly-summary",
+  analyticsCache,
+  analyticsController.getMonthlySummary,
+);
 
 /**
  * @swagger
@@ -41,6 +49,7 @@ router.get("/analytics/monthly-summary", analyticsController.getMonthlySummary);
  */
 router.get(
   "/analytics/spending-by-category",
+  analyticsCache,
   analyticsController.getSpendingByCategory,
 );
 
@@ -61,6 +70,10 @@ router.get(
  *       200:
  *         description: Monthly income/expense trend data
  */
-router.get("/analytics/monthly-trend", analyticsController.getMonthlyTrend);
+router.get(
+  "/analytics/monthly-trend",
+  analyticsCache,
+  analyticsController.getMonthlyTrend,
+);
 
 export default router;

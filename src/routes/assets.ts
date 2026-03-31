@@ -1,7 +1,9 @@
 import { Router, type IRouter } from "express";
 import * as assetController from "../controllers/assetController";
+import { cacheMiddleware } from "../middlewares/cacheMiddleware";
 
 const router: IRouter = Router();
+const assetCache = cacheMiddleware(2592000); // 30 days
 
 /**
  * @swagger
@@ -113,6 +115,6 @@ router.delete("/assets/:id", assetController.deleteAsset);
  *       200:
  *         description: Net worth history with breakdown
  */
-router.get("/assets/net-worth-history", assetController.getNetWorthHistory);
+router.get("/assets/net-worth-history", assetCache, assetController.getNetWorthHistory);
 
 export default router;

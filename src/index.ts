@@ -15,6 +15,11 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+import { connectRedis } from "./lib/redis";
+
+// Connect to Redis before starting the server
+await connectRedis();
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");

@@ -6,6 +6,7 @@ import {
   UpdateCategoryParams,
   DeleteCategoryParams,
 } from "../validation";
+import { clearUserCache } from "../lib/redis";
 
 export async function listCategories(req: Request, res: Response) {
   const userId = req.user!.id;
@@ -17,6 +18,7 @@ export async function createCategory(req: Request, res: Response) {
   const userId = req.user!.id;
   const body = CreateCategoryBody.parse(req.body);
   const created = await categoryRepository.createCategory(userId, body);
+  await clearUserCache(userId);
   res.status(201).json(created);
 }
 
@@ -39,6 +41,7 @@ export async function updateCategory(req: Request, res: Response): Promise<void>
     res.status(404).json({ error: "Category not found" });
     return;
   }
+  await clearUserCache(userId);
   res.json(updated);
 }
 
@@ -46,6 +49,7 @@ export async function deleteCategory(req: Request, res: Response) {
   const { id } = DeleteCategoryParams.parse(req.params);
   const userId = req.user!.id;
   await categoryRepository.deleteCategory(userId, String(id));
+  await clearUserCache(userId);
   res.status(204).send();
 }
 

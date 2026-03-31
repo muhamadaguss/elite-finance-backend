@@ -8,6 +8,7 @@ import {
   DeleteTransactionParams,
 } from "../validation";
 import { z } from "zod";
+import { clearUserCache } from "../lib/redis";
 
 const createTransactionSchema = z.object({
   date: z.string().regex(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/),
@@ -183,6 +184,7 @@ export async function createTransaction(req: Request, res: Response): Promise<vo
   }
 
   const catInfo = await getCategoryInfo(created.categoryId);
+  await clearUserCache(userId);
   res
     .status(201)
     .json({ ...created, amount: parseFloat(created.amount), ...catInfo });
@@ -291,6 +293,7 @@ export async function updateTransaction(req: Request, res: Response): Promise<vo
   }
 
   const catInfo = await getCategoryInfo(updated.categoryId);
+  await clearUserCache(userId);
   res.json({ ...updated, amount: parseFloat(updated.amount), ...catInfo });
 }
 
@@ -314,5 +317,6 @@ export async function deleteTransaction(req: Request, res: Response): Promise<vo
     await adjustAssetValue(deleted.assetId, -amount, deleted.type);
   }
 
+  await clearUserCache(userId);
   res.status(204).send();
 }
