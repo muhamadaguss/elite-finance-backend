@@ -26,9 +26,12 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-# Copy Drizzle files for in-container migrations (Option 2)
+# Copy Drizzle files for in-container migrations
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/src/db ./src/db
+
+# Copy routing source for Swagger JSDoc parser
+COPY --from=builder /app/src/routes ./src/routes
 
 EXPOSE 3000
 

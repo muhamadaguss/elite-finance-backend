@@ -33,11 +33,7 @@ const options: swaggerJsdoc.Options = {
         },
         security: [{ cookieAuth: [] }, { bearerAuth: [] }],
     },
-    apis: [
-        path.join(process.cwd(), "src/routes/*.ts"),   // Untuk dev (lokal)
-        path.join(process.cwd(), "dist/routes/*.mjs"), // Untuk production (Docker)
-        path.join(process.cwd(), "dist/routes/*.js"),  // Backup jika ada .js biasa
-    ],
+    apis: ["./src/routes/*.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
