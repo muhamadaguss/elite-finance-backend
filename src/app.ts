@@ -11,6 +11,11 @@ import { setupSwagger } from "./swagger";
 
 const app: Express = express();
 
+// Trust the first proxy (Cloudflare / Nginx) so that express-rate-limit
+// can correctly read the real client IP from 'X-Forwarded-For'
+// See: https://express-rate-limit.github.io/ERR_ERL_UNEXPECTED_X_FORWARDED_FOR/
+app.set("trust proxy", 1);
+
 // Security: Helmet headers
 app.use(helmet());
 
