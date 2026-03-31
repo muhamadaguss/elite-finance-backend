@@ -13,6 +13,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(receiptRouter); // Receipt routes before requireAuth so /receipt/scan can be public
 
 router.use(requireAuth);
 router.use(transactionsRouter);
@@ -20,6 +21,5 @@ router.use(categoriesRouter);
 router.use(analyticsRouter);
 router.use(assetsRouter);
 router.use(importRouter);
-router.use(receiptRouter);
 
 export default router;

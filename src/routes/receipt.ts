@@ -7,6 +7,7 @@ import { db, transactionsTable } from "../db";
 import { clearUserCache } from "../lib/redis";
 import { logger } from "../lib/logger";
 import { z } from "zod";
+import { requireAuth } from "../middlewares/requireAuth";
 
 const router: IRouter = Router();
 
@@ -17,7 +18,9 @@ const upload = multer({
     if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error("Hanya file gambar yang diperbolehkan (JPEG, PNG, WebP, dll)"));
+      cb(
+        new Error("Hanya file gambar yang diperbolehkan (JPEG, PNG, WebP, dll)")
+      );
     }
   },
 });
@@ -32,8 +35,8 @@ async function preprocessImage(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
     .resize({ width: 1800, withoutEnlargement: true }) // cap at 1800px wide
     .grayscale()
-    .normalise()                                        // auto-contrast
-    .sharpen({ sigma: 1.5 })                            // sharpen edges
+    .normalise() // auto-contrast
+    .sharpen({ sigma: 1.5 }) // sharpen edges
     .toFormat("png")
     .toBuffer();
 }
@@ -136,7 +139,8 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
   } catch (err) {
     logger.error({ err }, "Receipt scan failed");
     res.status(500).json({
-      error: "Gagal memproses gambar struk. Pastikan foto cukup jelas dan terang.",
+      error:
+        "Gagal memproses gambar struk. Pastikan foto cukup jelas dan terang.",
     });
   }
 });
@@ -144,7 +148,9 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
 // ─── Confirm Schema ───────────────────────────────────────────────────────────
 
 const ConfirmReceiptBody = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
   description: z.string().min(1, "Deskripsi tidak boleh kosong"),
   amount: z.number().positive("Jumlah harus lebih dari 0"),
   type: z.enum(["income", "expense", "transfer"]),
@@ -192,12 +198,7 @@ const ConfirmReceiptBody = z.object({
  *       401:
  *         description: Unauthorized
  */
-router.post("/receipt/confirm", async (req, res) => {
-  if (!req.isAuthenticated()) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
+router.post("/receipt/confirm", requireAuth, async (req, res) => {
   const result = ConfirmReceiptBody.safeParse(req.body);
   if (!result.success) {
     res.status(400).json({
@@ -220,7 +221,7 @@ router.post("/receipt/confirm", async (req, res) => {
         type: body.type,
         categoryId: body.categoryId ?? null,
         assetId: null,
-        tags: ["struk"],  // auto-tag as receipt-originated
+        tags: ["struk"], // auto-tag as receipt-originated
         notes: body.notes ?? null,
       })
       .returning();
