@@ -107,35 +107,39 @@ function extractDate(text: string): string | null {
 
 /**
  * Look for grand total / jumlah bayar patterns.
- * Priority order: TOTAL BAYAR > GRAND TOTAL > TOTAL > JUMLAH > SUBTOTAL
- * Also handles digital payment receipts (Jago, GoPay, OVO, etc.)
+ * Priority: Amount with "Rp" prefix first, then other patterns
  */
 const TOTAL_PATTERNS = [
-  // Digital payment apps - amount is usually displayed prominently at the top
-  /^Rp\s*(\d[\d.,]+)$/im, // Standalone "Rp376.530" on its own line
-  /^(\d[\d.,]{4,})$/m, // Standalone number "376530" or "376.530"
-  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
-  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
-  /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
-  /(?:\bsubtotal\b|\bsub\s*total\b)\s*[:\-]?\s*((?:Rp\.?\s*)?\d[\d.,]+)/i,
+  // PRIORITY 1: Amount with Rp prefix (most reliable for Indonesian receipts)
+  /Rp\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/i, // Rp376.530 or Rp 376.530
+  // PRIORITY 2: Labeled amounts
+  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
+  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
+  /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
 ];
 
 function extractTotal(text: string): number | null {
+  // Try patterns in order
   for (const pattern of TOTAL_PATTERNS) {
     const m = text.match(pattern);
     if (m?.[1]) {
       const val = parseCurrency(m[1]);
-      if (val > 0) return val;
+      // Validate: amount should be reasonable (between 1k and 100M)
+      if (val >= 1000 && val <= 100000000) {
+        return val;
+      }
     }
   }
 
-  // Fallback: find the largest currency amount in the text
-  const allAmounts = [...text.matchAll(/(?:Rp\.?\s*)?(\d[\d.,]{3,})/gi)]
+  // Fallback: find all amounts with Rp prefix and take the first reasonable one
+  const rpAmounts = [
+    ...text.matchAll(/Rp\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/gi),
+  ]
     .map((m) => parseCurrency(m[1]))
-    .filter((v) => v >= 1000); // at least Rp 1.000
+    .filter((v) => v >= 1000 && v <= 100000000); // reasonable range
 
-  if (allAmounts.length > 0) {
-    return Math.max(...allAmounts);
+  if (rpAmounts.length > 0) {
+    return rpAmounts[0]; // Take first Rp amount found
   }
 
   return null;
