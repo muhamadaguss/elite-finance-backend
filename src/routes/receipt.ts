@@ -19,7 +19,9 @@ const upload = multer({
       cb(null, true);
     } else {
       cb(
-        new Error("Hanya file gambar yang diperbolehkan (JPEG, PNG, WebP, dll)")
+        new Error(
+          "Hanya file gambar yang diperbolehkan (JPEG, PNG, WebP, dll)",
+        ),
       );
     }
   },
@@ -27,16 +29,12 @@ const upload = multer({
 
 /**
  * Pre-process image with sharp to improve OCR accuracy:
- * - Convert to grayscale (removes color noise)
- * - Increase contrast (makes text stand out)
- * - Resize to a comfortable size for Tesseract (not too small, not too huge)
+ * - Resize to optimal size for Tesseract
+ * - Light enhancement only to preserve text clarity
  */
 async function preprocessImage(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
-    .resize({ width: 1800, withoutEnlargement: true }) // cap at 1800px wide
-    .grayscale()
-    .normalise() // auto-contrast
-    .sharpen({ sigma: 1.5 }) // sharpen edges
+    .resize({ width: 2000, withoutEnlargement: true }) // Larger size for better text recognition
     .toFormat("png")
     .toBuffer();
 }
@@ -97,7 +95,7 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
 
   logger.info(
     { filename: req.file.originalname, size: req.file.size },
-    "Receipt scan started"
+    "Receipt scan started",
   );
 
   try {
@@ -120,7 +118,7 @@ router.post("/receipt/scan", upload.single("receipt"), async (req, res) => {
         itemCount: parsed.items.length,
         rawTextLength: rawText.length,
       },
-      "Receipt scan completed"
+      "Receipt scan completed",
     );
 
     // Return in the format the frontend ScanResult interface expects
@@ -238,7 +236,7 @@ router.post("/receipt/confirm", requireAuth, async (req, res) => {
 
     logger.info(
       { userId, transactionId: created.id, amount: body.amount },
-      "Receipt transaction saved"
+      "Receipt transaction saved",
     );
 
     res.status(201).json({

@@ -110,36 +110,60 @@ function extractDate(text: string): string | null {
  * Priority: Amount with "Rp" prefix first, then other patterns
  */
 const TOTAL_PATTERNS = [
-  // PRIORITY 1: Amount with Rp prefix (most reliable for Indonesian receipts)
-  /Rp\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/i, // Rp376.530 or Rp 376.530
+  // PRIORITY 1: Amount with Rp prefix - more flexible patterns
+  /Rp\s*(\d[\d.,\s]*\d)/gi, // Rp376.530 or Rp 376 530 or Rp376530
+  /Rp\s*(\d+)/gi, // Simple Rp followed by digits
   // PRIORITY 2: Labeled amounts
-  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
-  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
-  /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,]+)/i,
+  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
 ];
 
 function extractTotal(text: string): number | null {
-  // Try patterns in order
+  // Collect all potential amounts with Rp prefix
+  const rpAmounts: number[] = [];
+
+  // Try to find all Rp amounts
+  const rpMatches = text.matchAll(/Rp\s*(\d[\d.,\s]*)/gi);
+  for (const match of rpMatches) {
+    if (match[1]) {
+      const val = parseCurrency(match[1]);
+      // Validate: amount should be reasonable (between 100 and 1B)
+      if (val >= 100 && val <= 1000000000) {
+        rpAmounts.push(val);
+      }
+    }
+  }
+
+  // If we found Rp amounts, return the first reasonable one (usually the main amount)
+  if (rpAmounts.length > 0) {
+    // Filter out very large numbers (likely account numbers > 10M)
+    const reasonableAmounts = rpAmounts.filter((v) => v <= 10000000);
+    if (reasonableAmounts.length > 0) {
+      return reasonableAmounts[0];
+    }
+    return rpAmounts[0];
+  }
+
+  // Try other patterns
   for (const pattern of TOTAL_PATTERNS) {
     const m = text.match(pattern);
     if (m?.[1]) {
       const val = parseCurrency(m[1]);
-      // Validate: amount should be reasonable (between 1k and 100M)
-      if (val >= 1000 && val <= 100000000) {
+      if (val >= 100 && val <= 10000000) {
         return val;
       }
     }
   }
 
-  // Fallback: find all amounts with Rp prefix and take the first reasonable one
-  const rpAmounts = [
-    ...text.matchAll(/Rp\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})?)/gi),
-  ]
-    .map((m) => parseCurrency(m[1]))
-    .filter((v) => v >= 1000 && v <= 100000000); // reasonable range
+  // Last resort: look for any reasonable number in first 500 chars (where amount usually is)
+  const firstPart = text.slice(0, 500);
+  const allNumbers = [...firstPart.matchAll(/\b(\d{3,7})\b/g)]
+    .map((m) => parseInt(m[1]))
+    .filter((v) => v >= 1000 && v <= 10000000);
 
-  if (rpAmounts.length > 0) {
-    return rpAmounts[0]; // Take first Rp amount found
+  if (allNumbers.length > 0) {
+    return allNumbers[0];
   }
 
   return null;
