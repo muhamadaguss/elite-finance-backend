@@ -156,9 +156,14 @@ function extractTotal(text: string): number | null {
     }
   }
 
-  // Last resort: look for any reasonable number in first 500 chars (where amount usually is)
+  // Last resort: look for any reasonable number in first 500 chars
+  // BUT skip numbers that appear after "ID Transaksi" or "Transaksi"
   const firstPart = text.slice(0, 500);
-  const allNumbers = [...firstPart.matchAll(/\b(\d{3,7})\b/g)]
+
+  // Remove transaction ID section to avoid false positives
+  const cleanedText = firstPart.replace(/ID\s*Transaksi[:\s]*[\w\-]+/gi, "");
+
+  const allNumbers = [...cleanedText.matchAll(/\b(\d{3,7})\b/g)]
     .map((m) => parseInt(m[1]))
     .filter((v) => v >= 1000 && v <= 10000000);
 

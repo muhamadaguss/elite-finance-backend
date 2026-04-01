@@ -29,12 +29,16 @@ const upload = multer({
 
 /**
  * Pre-process image with sharp to improve OCR accuracy:
- * - Resize to optimal size for Tesseract
- * - Light enhancement only to preserve text clarity
+ * - Resize to optimal size
+ * - Enhance contrast for better text recognition
+ * - Convert to grayscale to reduce noise
  */
 async function preprocessImage(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer)
-    .resize({ width: 2000, withoutEnlargement: true }) // Larger size for better text recognition
+    .resize({ width: 2400, withoutEnlargement: true }) // Larger for better digit recognition
+    .greyscale() // Remove color
+    .normalize() // Auto-adjust contrast
+    .threshold(128) // Binarize image (black text on white background)
     .toFormat("png")
     .toBuffer();
 }
