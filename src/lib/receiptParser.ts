@@ -110,18 +110,18 @@ function extractDate(text: string): string | null {
  * Priority: Look for labeled totals first (Total, Grand Total, etc)
  */
 const TOTAL_PATTERNS = [
-  // PRIORITY 1: Labeled totals (most reliable)
+  // PRIORITY 1: TOTAL label (most common in Indonesian receipts)
+  /TOTAL\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
   /(?:grand\s*total|total\s*bayar|total\s*tagihan|total\s*pembayaran)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
-  /(?:sub\s*total|total)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  // PRIORITY 2: Sub total
+  /(?:sub\s*total|subtotal)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  // PRIORITY 3: Jumlah
   /(?:jumlah\s*bayar|yang\s*dibayar|dibayar|jumlah)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
-  // PRIORITY 2: Amount with Rp prefix (but only if no labeled total found)
-  /Rp\s*(\d[\d.,\s]*)/gi,
 ];
 
 function extractTotal(text: string): number | null {
   // STEP 1: Try to find labeled totals first (highest priority)
-  for (let i = 0; i < 3; i++) {
-    const pattern = TOTAL_PATTERNS[i];
+  for (const pattern of TOTAL_PATTERNS) {
     const m = text.match(pattern);
     if (m?.[1]) {
       const val = parseCurrency(m[1]);
@@ -133,7 +133,7 @@ function extractTotal(text: string): number | null {
 
   // STEP 2: If no labeled total, collect all Rp amounts
   const rpAmounts: number[] = [];
-  const rpMatches = text.matchAll(/Rp\s*(\d[\d.,\s]*)/gi);
+  const rpMatches = text.matchAll(/Rp\s*(\d[\d.,\s]+)/gi);
   for (const match of rpMatches) {
     if (match[1]) {
       const val = parseCurrency(match[1]);
@@ -143,25 +143,43 @@ function extractTotal(text: string): number | null {
     }
   }
 
-  // Take the LARGEST amount (usually the total)
   if (rpAmounts.length > 0) {
+    // Filter out very large numbers (likely not the total)
     const reasonableAmounts = rpAmounts.filter((v) => v <= 10000000);
     if (reasonableAmounts.length > 0) {
-      return Math.max(...reasonableAmounts); // Take largest, not first
+      // Take the smallest reasonable amount (usually the actual total, not TUNAI)
+      return Math.min(...reasonableAmounts);
     }
-    return Math.max(...rpAmounts);
+    return Math.min(...rpAmounts);
   }
 
-  // STEP 3: Last resort - look for reasonable numbers
+  // STEP 3: Look for any number pattern that might be total
+  // Common patterns: "TOTAL : 12,800" or "TOTAL 12800"
+  const totalMatch = text.match(/TOTAL\s*[:\-]?\s*(\d[\d.,\s]+)/i);
+  if (totalMatch?.[1]) {
+    const val = parseCurrency(totalMatch[1]);
+    if (val >= 100 && val <= 100000000) {
+      return val;
+    }
+  }
+
+  // STEP 4: Last resort - look for reasonable numbers, but exclude common false positives
   const firstPart = text.slice(0, 800);
-  const cleanedText = firstPart.replace(/ID\s*Transaksi[:\s]*[\w\-]+/gi, "");
+
+  // Remove known false positive patterns
+  const cleanedText = firstPart
+    .replace(/ID\s*Transaksi[:\s]*[\w\-]+/gi, "")
+    .replace(/TUNAI[:\s]*[\d.,\s]+/gi, "") // Remove TUNAI (cash given)
+    .replace(/KEMBALI[:\s]*[\d.,\s]+/gi, "") // Remove KEMBALI (change)
+    .replace(/PPN[:\s]*[\d.,\s]+/gi, ""); // Remove PPN (tax)
 
   const allNumbers = [...cleanedText.matchAll(/\b(\d{3,7})\b/g)]
     .map((m) => parseInt(m[1]))
     .filter((v) => v >= 1000 && v <= 10000000);
 
   if (allNumbers.length > 0) {
-    return Math.max(...allNumbers); // Take largest
+    // Take the smallest (likely the total, not TUNAI)
+    return Math.min(...allNumbers);
   }
 
   return null;
