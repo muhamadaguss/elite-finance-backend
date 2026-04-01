@@ -107,60 +107,53 @@ function extractDate(text: string): string | null {
 
 /**
  * Look for grand total / jumlah bayar patterns.
- * Priority: Amount with "Rp" prefix first, then other patterns
+ * Priority: Look for labeled totals first (Total, Grand Total, etc)
  */
 const TOTAL_PATTERNS = [
-  // PRIORITY 1: Amount with Rp prefix - more flexible patterns
-  /Rp\s*(\d[\d.,\s]*\d)/gi, // Rp376.530 or Rp 376 530 or Rp376530
-  /Rp\s*(\d+)/gi, // Simple Rp followed by digits
-  // PRIORITY 2: Labeled amounts
-  /(?:total\s*bayar|grand\s*total|total\s*tagihan|total\s*pembayaran|nominal)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
-  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
-  /(?:\btotal\b|\bjumlah\b)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  // PRIORITY 1: Labeled totals (most reliable)
+  /(?:grand\s*total|total\s*bayar|total\s*tagihan|total\s*pembayaran)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  /(?:sub\s*total|total)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  /(?:jumlah\s*bayar|yang\s*dibayar|dibayar|jumlah)\s*[:\-]?\s*(?:Rp\.?\s*)?(\d[\d.,\s]+)/i,
+  // PRIORITY 2: Amount with Rp prefix (but only if no labeled total found)
+  /Rp\s*(\d[\d.,\s]*)/gi,
 ];
 
 function extractTotal(text: string): number | null {
-  // Collect all potential amounts with Rp prefix
-  const rpAmounts: number[] = [];
-
-  // Try to find all Rp amounts
-  const rpMatches = text.matchAll(/Rp\s*(\d[\d.,\s]*)/gi);
-  for (const match of rpMatches) {
-    if (match[1]) {
-      const val = parseCurrency(match[1]);
-      // Validate: amount should be reasonable (between 100 and 1B)
-      if (val >= 100 && val <= 1000000000) {
-        rpAmounts.push(val);
-      }
-    }
-  }
-
-  // If we found Rp amounts, return the first reasonable one (usually the main amount)
-  if (rpAmounts.length > 0) {
-    // Filter out very large numbers (likely account numbers > 10M)
-    const reasonableAmounts = rpAmounts.filter((v) => v <= 10000000);
-    if (reasonableAmounts.length > 0) {
-      return reasonableAmounts[0];
-    }
-    return rpAmounts[0];
-  }
-
-  // Try other patterns
-  for (const pattern of TOTAL_PATTERNS) {
+  // STEP 1: Try to find labeled totals first (highest priority)
+  for (let i = 0; i < 3; i++) {
+    const pattern = TOTAL_PATTERNS[i];
     const m = text.match(pattern);
     if (m?.[1]) {
       const val = parseCurrency(m[1]);
-      if (val >= 100 && val <= 10000000) {
+      if (val >= 100 && val <= 100000000) {
         return val;
       }
     }
   }
 
-  // Last resort: look for any reasonable number in first 500 chars
-  // BUT skip numbers that appear after "ID Transaksi" or "Transaksi"
-  const firstPart = text.slice(0, 500);
+  // STEP 2: If no labeled total, collect all Rp amounts
+  const rpAmounts: number[] = [];
+  const rpMatches = text.matchAll(/Rp\s*(\d[\d.,\s]*)/gi);
+  for (const match of rpMatches) {
+    if (match[1]) {
+      const val = parseCurrency(match[1]);
+      if (val >= 100 && val <= 100000000) {
+        rpAmounts.push(val);
+      }
+    }
+  }
 
-  // Remove transaction ID section to avoid false positives
+  // Take the LARGEST amount (usually the total)
+  if (rpAmounts.length > 0) {
+    const reasonableAmounts = rpAmounts.filter((v) => v <= 10000000);
+    if (reasonableAmounts.length > 0) {
+      return Math.max(...reasonableAmounts); // Take largest, not first
+    }
+    return Math.max(...rpAmounts);
+  }
+
+  // STEP 3: Last resort - look for reasonable numbers
+  const firstPart = text.slice(0, 800);
   const cleanedText = firstPart.replace(/ID\s*Transaksi[:\s]*[\w\-]+/gi, "");
 
   const allNumbers = [...cleanedText.matchAll(/\b(\d{3,7})\b/g)]
@@ -168,7 +161,7 @@ function extractTotal(text: string): number | null {
     .filter((v) => v >= 1000 && v <= 10000000);
 
   if (allNumbers.length > 0) {
-    return allNumbers[0];
+    return Math.max(...allNumbers); // Take largest
   }
 
   return null;
