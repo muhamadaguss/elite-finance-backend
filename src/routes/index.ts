@@ -8,6 +8,7 @@ import analyticsRouter from "./analytics";
 import assetsRouter from "./assets";
 import importRouter from "./import";
 import receiptRouter from "./receipt";
+import goalsRouter from "./goals";
 
 const router: IRouter = Router();
 
@@ -21,5 +22,6 @@ router.use(categoriesRouter);
 router.use(analyticsRouter);
 router.use(assetsRouter);
 router.use(importRouter);
+router.use(goalsRouter);
 
 export default router;

@@ -451,3 +451,78 @@ export const ConfirmImportResponse = zod.object({
   imported: zod.number(),
   failed: zod.number(),
 });
+
+// Goals Tracking Feature Validation Schemas
+
+export const GoalTypeEnum = zod.enum([
+  "saving",
+  "debt_payoff",
+  "investment",
+  "emergency_fund",
+]);
+export const TrackingModeEnum = zod.enum(["automatic", "manual"]);
+
+export const CreateGoalBody = zod.object({
+  name: zod.string().min(1),
+  type: GoalTypeEnum,
+  targetAmount: zod.number().positive(),
+  deadline: zod.string(),
+  description: zod.string().optional(),
+  icon: zod.string().optional(),
+  color: zod.string().optional(),
+  trackingMode: TrackingModeEnum,
+});
+
+export const UpdateGoalBody = zod.object({
+  name: zod.string().min(1).optional(),
+  targetAmount: zod.number().positive().optional(),
+  deadline: zod.string().optional(),
+  description: zod.string().optional(),
+  icon: zod.string().optional(),
+  color: zod.string().optional(),
+});
+
+export const CreateGoalAssetLinkBody = zod.object({
+  assetId: zod.number(),
+  allocationPercentage: zod.number().min(0).max(100).optional().default(100),
+});
+
+export const UpdateGoalAssetLinkBody = zod.object({
+  allocationPercentage: zod.number().min(0).max(100),
+});
+
+export const CreateContributionBody = zod.object({
+  amount: zod.number(),
+  date: zod.string(),
+  notes: zod.string().optional(),
+});
+
+export const UpdateContributionBody = zod.object({
+  amount: zod.number().optional(),
+  date: zod.string().optional(),
+  notes: zod.string().optional(),
+});
+
+export const GoalParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GoalAssetLinkParams = zod.object({
+  id: zod.coerce.number(),
+  linkId: zod.coerce.number(),
+});
+
+export const GoalContributionParams = zod.object({
+  id: zod.coerce.number(),
+  contributionId: zod.coerce.number(),
+});
+
+export const ListGoalsQueryParams = zod.object({
+  type: GoalTypeEnum.optional(),
+  trackingMode: TrackingModeEnum.optional(),
+  status: zod.enum(["completed", "in_progress", "overdue"]).optional(),
+  sortBy: zod
+    .enum(["deadline", "progressPercentage", "targetAmount", "createdAt"])
+    .optional(),
+  order: zod.enum(["asc", "desc"]).optional(),
+});

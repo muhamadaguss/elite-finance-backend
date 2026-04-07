@@ -57,6 +57,7 @@ export async function getNetWorthHistory(userId: string) {
 }
 import { db, assetsTable, assetHistoryTable } from "../db";
 import { eq, and, desc } from "drizzle-orm";
+import * as goalRepository from "./goalRepository";
 
 export async function listAssets(userId: string) {
   const assets = await db
@@ -114,6 +115,10 @@ export async function updateAsset(userId: string, id: string, body: any) {
 
 export async function deleteAsset(userId: string, id: string) {
   const assetId = typeof id === "string" ? parseInt(id, 10) : id;
+
+  // Delete goal asset links before deleting the asset
+  await goalRepository.deleteGoalAssetLinksByAssetId(assetId);
+
   await db
     .delete(assetsTable)
     .where(and(eq(assetsTable.id, assetId), eq(assetsTable.userId, userId)));
